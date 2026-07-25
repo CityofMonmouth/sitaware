@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Situational Awareness Board — free, open-source emergency alerting</title>
+<meta name="description" content="A free, self-hosted situational awareness and alerting board for small and rural emergency management agencies. Open source, AGPL-3.0.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14161a;
+    --panel: #1d2025;
+    --panel-raised: #22262c;
+    --border: #2c3036;
+    --text: #e4e6eb;
+    --muted: #9aa0a8;
+    --gold: #fad232;
+    --gold-dim: #8a7420;
+    --urgent: #d9392f;
+    --advisory: #d9a520;
+    --info: #3d7ab5;
+    --font-display: "Oswald", "Arial Narrow", sans-serif;
+    --font-body: "Inter", "Segoe UI", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Consolas, "Liberation Mono", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 34px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 34px),
+      radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.25) 75%);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: var(--font-body);
+    line-height: 1.5;
+  }
+
+  a { color: inherit; }
+
+  .accent-bar { height: 4px; background: var(--gold); }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  header.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .brand {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 1.05rem;
+    text-decoration: none;
+  }
+
+  nav a.gh-link {
+    text-decoration: none;
+    color: var(--text);
+    font-size: 0.9rem;
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    border-radius: 4px;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  nav a.gh-link:hover { border-color: var(--gold); color: var(--gold); }
+
+  .hero {
+    padding: 72px 24px 40px;
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 56px;
+    align-items: start;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 18px;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 2.7rem;
+    line-height: 1.08;
+    letter-spacing: 0.2px;
+    margin: 0 0 20px;
+  }
+
+  .hero p.sub {
+    font-size: 1.1rem;
+    color: var(--muted);
+    max-width: 46ch;
+    margin: 0 0 32px;
+  }
+
+  .cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  .btn {
+    display: inline-block;
+    text-decoration: none;
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    padding: 13px 24px;
+    border-radius: 4px;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .btn-primary { background: var(--gold); color: #1a1a1a; }
+  .btn-primary:hover { background: #e0bc2a; }
+  .btn-secondary { border: 1px solid var(--border); color: var(--text); }
+  .btn-secondary:hover { border-color: var(--gold); color: var(--gold); }
+
+  .mock-board {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+  }
+
+  .mock-board-label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 14px;
+  }
+
+  .mock-card {
+    background: var(--panel-raised);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--info);
+    border-radius: 4px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: cardIn 0.5s ease forwards;
+  }
+  .mock-card:last-child { margin-bottom: 0; }
+  .mock-card.urgent { border-left-color: var(--urgent); }
+  .mock-card.advisory { border-left-color: var(--advisory); }
+  .mock-card.info { border-left-color: var(--info); }
+  .mock-card:nth-child(1) { animation-delay: 0.05s; }
+  .mock-card:nth-child(2) { animation-delay: 0.18s; }
+  .mock-card:nth-child(3) { animation-delay: 0.31s; }
+
+  @keyframes cardIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .mock-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  .mock-badge {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    text-transform: uppercase;
+  }
+  .mock-badge.urgent { background: var(--urgent); color: #fff; }
+  .mock-badge.advisory { background: var(--advisory); color: #1a1a1a; }
+  .mock-badge.info { background: var(--info); color: #fff; }
+  .mock-badge.cat { background: #2c3036; color: var(--muted); }
+
+  .mock-time {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+
+  .mock-card h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1rem;
+    margin: 4px 0 6px;
+  }
+
+  .mock-card p {
+    font-size: 0.88rem;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  section { padding: 56px 24px; }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    font-size: 1.5rem;
+    margin: 0 0 8px;
+    text-align: center;
+  }
+
+  .section-sub {
+    text-align: center;
+    color: var(--muted);
+    max-width: 60ch;
+    margin: 0 auto 40px;
+  }
+
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    max-width: 780px;
+    margin: 0 auto;
+  }
+
+  .compare-col {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+  }
+  .compare-col.this { border-color: var(--gold-dim); }
+
+  .compare-label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .compare-col.this .compare-label { color: var(--gold); }
+
+  .compare-figure {
+    font-family: var(--font-display);
+    font-size: 1.7rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .compare-desc { color: var(--muted); font-size: 0.9rem; }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+
+  .feature-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+
+  .feature-card h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.02rem;
+    margin: 0 0 8px;
+  }
+
+  .feature-card p {
+    color: var(--muted);
+    font-size: 0.88rem;
+    margin: 0;
+  }
+
+  .steps {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .step {
+    display: flex;
+    gap: 20px;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .step:last-child { border-bottom: none; }
+
+  .step-num {
+    font-family: var(--font-mono);
+    color: var(--gold);
+    font-size: 0.95rem;
+    flex-shrink: 0;
+    width: 28px;
+  }
+
+  .step-body h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1rem;
+    margin: 0 0 4px;
+  }
+  .step-body p { color: var(--muted); font-size: 0.9rem; margin: 0; }
+  .step-body code {
+    font-family: var(--font-mono);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.85rem;
+  }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 24px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+
+  footer a { color: var(--gold); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  footer .origin {
+    max-width: 60ch;
+    margin: 0 auto 20px;
+  }
+
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; padding-top: 48px; }
+    h1 { font-size: 2.1rem; }
+    .compare { grid-template-columns: 1fr; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mock-card { animation: none; opacity: 1; transform: none; }
+    html { scroll-behavior: auto; }
+  }
+
+  :focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<div class="accent-bar"></div>
+<header class="topbar">
+  <a class="brand" href="#top">Situational Awareness Board</a>
+  <nav>
+    <a class="gh-link" href="https://github.com/CityofMonmouth/sitaware" target="_blank" rel="noopener">View on GitHub</a>
+  </nav>
+</header>
+
+<section class="hero" id="top">
+  <div>
+    <div class="eyebrow">Free &amp; open source &middot; AGPL-3.0</div>
+    <h1>Situational awareness for agencies priced out of the alternatives.</h1>
+    <p class="sub">
+      A free, self-hosted alerting and situational awareness platform for small
+      and rural emergency management agencies. Post updates, alert staff by
+      email and SMS, and give your agency a shared live view of what's
+      happening &mdash; built to replace tools like Everbridge, CodeRED, and
+      WebEOC where the budget for them was never there.
+    </p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/CityofMonmouth/sitaware" target="_blank" rel="noopener">Get it on GitHub</a>
+      <a class="btn btn-secondary" href="https://github.com/CityofMonmouth/sitaware/blob/main/How%20to%20Deploy.md" target="_blank" rel="noopener">Read the docs</a>
+    </div>
+  </div>
+
+  <div class="mock-board">
+    <div class="mock-board-label">Live board &mdash; example</div>
+
+    <div class="mock-card urgent">
+      <div class="mock-card-head">
+        <span class="mock-badge urgent">Urgent</span>
+        <span class="mock-badge cat">Incident</span>
+        <span class="mock-time">2026-07-25 14:32 CDT</span>
+      </div>
+      <h3>Water Main Break &mdash; Main St &amp; 4th</h3>
+      <p>Public Works responding. Expect pressure loss in the area through this evening.</p>
+    </div>
+
+    <div class="mock-card advisory">
+      <div class="mock-card-head">
+        <span class="mock-badge advisory">Advisory</span>
+        <span class="mock-badge cat">Weather / Road</span>
+        <span class="mock-time">2026-07-25 06:10 CDT</span>
+      </div>
+      <h3>Winter Storm Watch</h3>
+      <p>2&ndash;4 inches expected overnight. Plan for slick roads during the morning commute.</p>
+    </div>
+
+    <div class="mock-card info">
+      <div class="mock-card-head">
+        <span class="mock-badge info">Info</span>
+        <span class="mock-badge cat">Training</span>
+        <span class="mock-time">2026-07-24 09:00 CDT</span>
+      </div>
+      <h3>Monthly EOC Drill &mdash; Thursday 0900</h3>
+      <p>All department liaisons expected. Sign-in at the front desk.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2 class="section-title">Built for the budget you actually have</h2>
+  <p class="section-sub">
+    Commercial mass-notification platforms are priced for large jurisdictions
+    with dedicated budgets &mdash; not a two-person emergency management office.
+  </p>
+  <div class="compare">
+    <div class="compare-col">
+      <div class="compare-label">Commercial platforms</div>
+      <div class="compare-figure">$$$$ / year</div>
+      <div class="compare-desc">Annual licensing, per-seat costs, vendor lock-in, and features built for jurisdictions far larger than yours.</div>
+    </div>
+    <div class="compare-col this">
+      <div class="compare-label">This</div>
+      <div class="compare-figure">$0 / year</div>
+      <div class="compare-desc">Free, forever. Self-hosted on hardware you already control. No subscription, no per-agency fee, no vendor to negotiate with.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2 class="section-title">What's included</h2>
+  <p class="section-sub">Everything below ships in the same free release &mdash; nothing is a paid tier.</p>
+  <div class="features-grid">
+    <div class="feature-card">
+      <h3>Emergency Alert button</h3>
+      <p>One field, one click. Immediately posts an Urgent update, emails your distribution list, and texts your SMS alert list, all at once.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Email &amp; SMS notifications</h3>
+      <p>Automatic alerts on urgent posts via any SMTP provider and Twilio, with a separate opt-in list for routine updates.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Kiosk display mode</h3>
+      <p>A large-font, no-login view built for a wall-mounted TV, auto-refreshing, with live weather and radar built in.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Two-tier access</h3>
+      <p>Full staff accounts for posting and admin, plus an optional shared read-only password for partner agencies or the public.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Live weather &amp; radar</h3>
+      <p>NOAA forecast, NEXRAD radar loop, and space weather conditions, configured for your exact location.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Security-hardened</h3>
+      <p>CSRF protection, rate limiting, security headers, hardened sessions &mdash; audited for public-internet exposure, not just internal use.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2 class="section-title">Get started</h2>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-body">
+        <h3>Clone the repository</h3>
+        <p><code>git clone https://github.com/CityofMonmouth/sitaware.git</code></p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-body">
+        <h3>Create your configuration</h3>
+        <p>Copy <code>.env.example</code> to <code>.env</code> and set a real <code>SECRET_KEY</code> &mdash; the app won't start without one.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-body">
+        <h3>Build and run</h3>
+        <p><code>docker compose up -d --build</code> &mdash; live in a couple of minutes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p class="origin">
+    Originally built in-house by the City of Monmouth, Illinois for local
+    police and emergency management use, then released as free, open-source
+    software so other small and rural agencies with the same budget
+    constraints can use it too.
+  </p>
+  <p>
+    <a href="https://github.com/CityofMonmouth/sitaware" target="_blank" rel="noopener">GitHub</a>
+    &nbsp;&middot;&nbsp;
+    <a href="https://github.com/CityofMonmouth/sitaware/blob/main/LICENSE" target="_blank" rel="noopener">AGPL-3.0 License</a>
+  </p>
+</footer>
+</body>
+</html>
