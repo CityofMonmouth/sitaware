@@ -41,7 +41,7 @@ hardware you already control.
 ## Quick start
 
 ```
-git clone https://github.com/Cityofmonmouth/sitaware.git
+git clone https://github.com/CityofMonmouth/sitaware.git
 cd sitaware
 docker compose up -d --build
 ```
