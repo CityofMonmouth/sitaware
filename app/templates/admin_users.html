@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Users</h1>
+<table class="userlist">
+<tr><th>Username</th><th>Name</th><th>Agency</th><th>Role</th><th>Active</th><th></th></tr>
+{% for u in users %}
+<tr>
+<td>{{ u.username }}</td>
+<td>{{ u.display_name }}</td>
+<td>{{ u.agency }}</td>
+<td>{{ u.role }}</td>
+<td>{{ 'Yes' if u.active_flag else 'No' }}</td>
+<td>
+  <a href="{{ url_for('main.edit_user', user_id=u.id) }}">Edit</a>
+  &nbsp;|&nbsp;
+  <form method="post" action="{{ url_for('main.toggle_user', user_id=u.id) }}" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">{{ 'Deactivate' if u.active_flag else 'Activate' }}</button>
+  </form>
+</td>
+</tr>
+{% endfor %}
+</table>
+
+<h2>Add User</h2>
+<form method="post" class="form">
+  {{ form.hidden_tag() }}
+  <label>{{ form.username.label }} {{ form.username() }}</label>
+  <label>{{ form.display_name.label }} {{ form.display_name() }}</label>
+  <label>{{ form.agency.label }} {{ form.agency() }}</label>
+  <label>{{ form.password.label }} {{ form.password() }}</label>
+  <label>{{ form.role.label }} {{ form.role() }}</label>
+  {{ form.submit() }}
+</form>
+{% endblock %}

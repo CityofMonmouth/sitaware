@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Edit User: {{ user.username }}</h1>
+<form method="post" class="form">
+  {{ form.hidden_tag() }}
+  <label>{{ form.display_name.label }} {{ form.display_name() }}</label>
+  <label>{{ form.agency.label }} {{ form.agency() }}</label>
+  <label>{{ form.role.label }} {{ form.role() }}</label>
+  <label>{{ form.password.label }} {{ form.password() }}</label>
+  {{ form.submit() }}
+</form>
+<p class="source-note"><a href="{{ url_for('main.admin_users') }}">&larr; Back to Users</a></p>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>{{ 'New Update' if mode == 'new' else 'Edit Update' }}</h1>
+
+{% if mode == 'edit' and post.attachments %}
+<div class="existing-attachments">
+  <p class="label-line">Current attachments</p>
+  {% for att in post.attachments %}
+    <div class="att-row">
+      <a href="{{ url_for('main.uploaded_file', filename=att.stored_name) }}" target="_blank">{{ att.original_name }}</a>
+      <form method="post" action="{{ url_for('main.delete_attachment', attachment_id=att.id) }}" class="inline-form" data-confirm="Remove this attachment?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link-btn">Remove</button>
+      </form>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form method="post" class="form" enctype="multipart/form-data">
+  {{ form.hidden_tag() }}
+  <label>{{ form.title.label }} {{ form.title(size=60) }}</label>
+  <label>{{ form.category.label }} {{ form.category() }}</label>
+  <label>{{ form.priority.label }} {{ form.priority() }}</label>
+  <label>{{ form.body.label }}<br>{{ form.body(rows=6, cols=60) }}</label>
+  <label>{{ form.expires_at.label }} {{ form.expires_at() }}</label>
+  <label>Attach files (PDF, JPG, PNG)
+    <input type="file" name="attachments" multiple accept=".pdf,.jpg,.jpeg,.png">
+  </label>
+  {% if mode == 'new' %}
+  <label class="checkbox-label">{{ form.notify_email() }} {{ form.notify_email.label.text }}</label>
+  {% endif %}
+  {{ form.submit() }}
+</form>
+{% endblock %}

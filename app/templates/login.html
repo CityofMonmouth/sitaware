@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Sign In</h1>
+
+<div class="login-choices">
+  <section class="login-option">
+    <h2>Staff Sign In</h2>
+    <p class="source-note">Full access — post updates, manage the distribution lists, admin functions.</p>
+    <form method="post" class="form">
+      {{ personal_form.hidden_tag() }}
+      <label>{{ personal_form.username.label }} {{ personal_form.username(size=32) }}</label>
+      <label>{{ personal_form.password.label }} {{ personal_form.password(size=32) }}</label>
+      {{ personal_form.submit() }}
+    </form>
+  </section>
+
+  <section class="login-option">
+    <h2>Agency / Partner Access</h2>
+    <p class="source-note">View the board only — read-only, no posting or editing. Shares one password across agencies.</p>
+    {% if agency_configured %}
+    <form method="post" class="form">
+      {{ agency_form.hidden_tag() }}
+      <label>{{ agency_form.password.label }} {{ agency_form.password(size=32) }}</label>
+      {{ agency_form.submit() }}
+    </form>
+    {% else %}
+    <p class="empty">Not yet configured.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

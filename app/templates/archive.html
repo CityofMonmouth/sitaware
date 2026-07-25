@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Archive</h1>
+<form method="get" class="filter-bar">
+  <select name="category" data-autosubmit>
+    <option value="">All Categories</option>
+    {% for value, label in category_choices %}
+    <option value="{{ value }}" {% if selected_category == value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <select name="priority" data-autosubmit>
+    <option value="">All Priorities</option>
+    {% for value, label in priority_choices %}
+    <option value="{{ value }}" {% if selected_priority == value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  {% if selected_category or selected_priority %}
+  <a href="{{ url_for('main.archive') }}" class="clear-filter">Clear filters</a>
+  {% endif %}
+</form>
+<div class="board">
+{% if not posts %}
+  <p class="empty">No archived updates{{ ' matching this filter' if selected_category or selected_priority else '' }} yet.</p>
+{% endif %}
+{% for post in posts %}
+  <article class="card priority-{{ post.priority }} archived">
+    <div class="card-head">
+      <span class="badge priority-badge priority-{{ post.priority }}">{{ post.priority|upper }}</span>
+      <span class="badge category-badge">{{ category_labels.get(post.category, post.category) }}</span>
+      <span class="time">{{ post.created_at | central_time }}</span>
+    </div>
+    <h2>{{ post.title }}</h2>
+    <p class="body">{{ post.body }}</p>
+    {% if post.attachments %}
+    <div class="attachments">
+      {% for att in post.attachments %}
+        {% if att.content_type and att.content_type.startswith('image/') %}
+        <a href="{{ url_for('main.uploaded_file', filename=att.stored_name) }}" target="_blank" class="att-thumb">
+          <img src="{{ url_for('main.uploaded_file', filename=att.stored_name) }}" alt="{{ att.original_name }}">
+        </a>
+        {% else %}
+        <a href="{{ url_for('main.uploaded_file', filename=att.stored_name) }}" target="_blank" class="att-file">&#128206; {{ att.original_name }}</a>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="card-foot">
+      <span>{{ post.author_name }}{% if post.agency %} &mdash; {{ post.agency }}{% endif %}</span>
+    </div>
+  </article>
+{% endfor %}
+</div>
+{% endblock %}

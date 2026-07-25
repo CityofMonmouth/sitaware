@@ -1,0 +1,47 @@
+services:
+  sitaware-briefing:
+    build: .
+    container_name: sitaware-briefing
+    ports:
+      # Currently bound to all interfaces (0.0.0.0) for direct LAN access.
+      # If deploying behind a reverse proxy (Caddy/nginx with TLS), change
+      # this to "127.0.0.1:8082:8082" so only the proxy on this same host
+      # can reach it — nothing external should hit this port directly.
+      - "8082:8082"
+    volumes:
+      - ./data:/app/data
+    environment:
+      # No default here on purpose — the app refuses to start without a real
+      # SECRET_KEY rather than silently using a guessable one. Generate with:
+      #   openssl rand -hex 32
+      - "SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set in .env -- generate one with: openssl rand -hex 32}"
+      - BEHIND_PROXY=${BEHIND_PROXY:-false}
+      - FORCE_HTTPS=${FORCE_HTTPS:-false}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-ChangeMe123!}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS:-}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-true}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - TWILIO_FROM_NUMBER=${TWILIO_FROM_NUMBER:-}
+      - AGENCY_PASSWORD=${AGENCY_PASSWORD:-}
+      # Branding — generic defaults on purpose. Set these in .env to brand
+      # your own deployment; leave unset for a plain, unbranded instance.
+      - BOARD_TITLE=${BOARD_TITLE:-Situational Awareness Board}
+      - FOOTER_CREDIT=${FOOTER_CREDIT:-}
+      - SHOW_LOGOS=${SHOW_LOGOS:-true}
+      - WEATHER_LOCATION_NAME=${WEATHER_LOCATION_NAME:-your area}
+      - WEATHER_LAT=${WEATHER_LAT:-40.9106}
+      - WEATHER_LON=${WEATHER_LON:--90.6482}
+      - RADAR_STATION_ID=${RADAR_STATION_ID:-KDVN}
+      - NWS_CONTACT_EMAIL=${NWS_CONTACT_EMAIL:-admin@example.gov}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    restart: unless-stopped

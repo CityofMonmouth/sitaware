@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block body_class %}wide-board{% endblock %}
+{% block extra_head %}<meta http-equiv="refresh" content="1200">{% endblock %}
+{% block content %}
+<div class="two-col-layout">
+  <div class="briefing-col">
+    <form method="get" class="filter-bar">
+      <select name="category" data-autosubmit>
+        <option value="">All Categories</option>
+        {% for value, label in category_choices %}
+        <option value="{{ value }}" {% if selected_category == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <select name="priority" data-autosubmit>
+        <option value="">All Priorities</option>
+        {% for value, label in priority_choices %}
+        <option value="{{ value }}" {% if selected_priority == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      {% if selected_category or selected_priority %}
+      <a href="{{ url_for('main.index') }}" class="clear-filter">Clear filters</a>
+      {% endif %}
+    </form>
+    <div class="board">
+    {% if not posts %}
+      <p class="empty">No active updates{{ ' matching this filter' if selected_category or selected_priority else '' }}.</p>
+    {% endif %}
+    {% for post in posts %}
+      <article class="card priority-{{ post.priority }}">
+        <div class="card-head">
+          <span class="badge priority-badge priority-{{ post.priority }}">{{ post.priority|upper }}</span>
+          <span class="badge category-badge">{{ category_labels.get(post.category, post.category) }}</span>
+          <span class="time">{{ post.created_at | central_time }}</span>
+        </div>
+        <h2>{{ post.title }}</h2>
+        <p class="body">{{ post.body }}</p>
+        {% if post.attachments %}
+        <div class="attachments">
+          {% for att in post.attachments %}
+            {% if att.content_type and att.content_type.startswith('image/') %}
+            <a href="{{ url_for('main.uploaded_file', filename=att.stored_name) }}" target="_blank" class="att-thumb">
+              <img src="{{ url_for('main.uploaded_file', filename=att.stored_name) }}" alt="{{ att.original_name }}">
+            </a>
+            {% else %}
+            <a href="{{ url_for('main.uploaded_file', filename=att.stored_name) }}" target="_blank" class="att-file">&#128206; {{ att.original_name }}</a>
+            {% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="card-foot">
+          <span>{{ post.author_name }}{% if post.agency %} &mdash; {{ post.agency }}{% endif %}</span>
+          {% if current_user.is_authenticated and (current_user.id == post.author_id or current_user.role == 'admin') %}
+          <span class="actions">
+            <a href="{{ url_for('main.edit_post', post_id=post.id) }}">Edit</a>
+            <form method="post" action="{{ url_for('main.delete_post', post_id=post.id) }}" class="inline-form" data-confirm="Delete this update?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="link-btn">Delete</button>
+            </form>
+          </span>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
+    </div>
+  </div>
+  <aside class="weather-col">
+    <h2 class="sidebar-heading">Weather &mdash; {{ weather_location }}</h2>
+    {% if forecast %}
+    <div class="forecast-grid sidebar-forecast">
+      {% for period in forecast[:4] %}
+      <div class="forecast-card">
+        <div class="fc-name">{{ period.name }}</div>
+        <div class="fc-temp">{{ period.temperature }}&deg;{{ period.temperatureUnit }}</div>
+        <div class="fc-short">{{ period.shortForecast }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">Forecast temporarily unavailable.</p>
+    {% endif %}
+    <img src="https://radar.weather.gov/ridge/standard/{{ radar_station }}_loop.gif" alt="{{ radar_station }} radar loop" class="radar-img">
+    <p class="source-note"><a href="{{ url_for('main.weather') }}">Full weather &amp; radar &rarr;</a></p>
+  </aside>
+</div>
+{% endblock %}
+

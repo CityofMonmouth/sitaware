@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Email Notification List</h1>
+
+{% if not smtp_configured %}
+<div class="flash error">
+  SMTP isn't configured yet — emails won't actually send until <code>SMTP_HOST</code>
+  and related settings are set in <code>.env</code>. You can still build the list now;
+  sending will start working as soon as SMTP is configured.
+</div>
+{% endif %}
+
+<p class="source-note">
+  Everyone on this list gets an email whenever someone posts a new update with
+  "Email this update to the distribution list" checked. Addresses are never shown to
+  each other in the email.
+</p>
+
+<table class="userlist">
+<tr><th>Email</th><th>Label</th><th>Added</th><th></th></tr>
+{% for sub in subscribers %}
+<tr>
+  <td>{{ sub.email }}</td>
+  <td>{{ sub.label or '' }}</td>
+  <td>{{ sub.added_at.strftime('%Y-%m-%d') }}</td>
+  <td>
+    <form method="post" action="{{ url_for('main.delete_subscriber', subscriber_id=sub.id) }}" class="inline-form" data-confirm="Remove this address from the list?">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit">Remove</button>
+    </form>
+  </td>
+</tr>
+{% else %}
+<tr><td colspan="4" class="empty">No addresses on the list yet.</td></tr>
+{% endfor %}
+</table>
+
+<h2>Add Address</h2>
+<form method="post" class="form">
+  {{ form.hidden_tag() }}
+  <label>{{ form.email.label }} {{ form.email(size=40) }}</label>
+  <label>{{ form.label.label }} {{ form.label(size=40) }}</label>
+  {{ form.submit() }}
+</form>
+{% endblock %}

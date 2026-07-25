@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Emergency Alert</h1>
+<p class="source-note">
+  This immediately posts an <strong>Urgent</strong> update to the board, emails the
+  distribution list, and texts everyone on the Text Alerts list. Use this only for an
+  actual incident in progress &mdash; not a test, not a drill notice.
+</p>
+<form method="post" class="form" data-confirm="Send this emergency alert now? It will immediately post to the board, email the distribution list, and text everyone on the SMS alert list. This cannot be recalled once sent. Continue?">
+  {{ form.hidden_tag() }}
+  <label>{{ form.message.label }}<br>
+    {{ form.message(rows=5, cols=60, placeholder="e.g. Active structure fire at 123 Main St — all available units respond") }}
+  </label>
+  <button type="submit" class="emergency-submit">Send Emergency Alert</button>
+</form>
+{% endblock %}

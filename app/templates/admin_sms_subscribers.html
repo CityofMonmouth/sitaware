@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Text Alert List</h1>
+
+{% if not twilio_configured %}
+<div class="flash error">
+  Twilio isn't configured yet — texts won't actually send until
+  <code>TWILIO_ACCOUNT_SID</code>, <code>TWILIO_AUTH_TOKEN</code>, and
+  <code>TWILIO_FROM_NUMBER</code> are set in <code>.env</code>. You can still build
+  the list now; sending will start working as soon as Twilio is configured.
+</div>
+{% endif %}
+
+<p class="source-note">
+  This list is separate from the Email List. Everyone on it gets a text automatically
+  whenever a new post is marked <strong>Urgent</strong> priority &mdash; there's no
+  per-post checkbox for this one, since the Urgent priority itself is the trigger.
+  Non-urgent posts never send a text.
+</p>
+
+<table class="userlist">
+<tr><th>Phone</th><th>Label</th><th>Added</th><th></th></tr>
+{% for sub in subscribers %}
+<tr>
+  <td>{{ sub.phone }}</td>
+  <td>{{ sub.label or '' }}</td>
+  <td>{{ sub.added_at.strftime('%Y-%m-%d') }}</td>
+  <td>
+    <form method="post" action="{{ url_for('main.delete_sms_subscriber', subscriber_id=sub.id) }}" class="inline-form" data-confirm="Remove this number from the list?">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit">Remove</button>
+    </form>
+  </td>
+</tr>
+{% else %}
+<tr><td colspan="4" class="empty">No numbers on the list yet.</td></tr>
+{% endfor %}
+</table>
+
+<h2>Add Number</h2>
+<form method="post" class="form">
+  {{ form.hidden_tag() }}
+  <label>{{ form.phone.label }} {{ form.phone(size=30) }}</label>
+  <label>{{ form.label.label }} {{ form.label(size=40) }}</label>
+  {{ form.submit() }}
+</form>
+{% endblock %}

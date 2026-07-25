@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block extra_head %}<meta http-equiv="refresh" content="300">{% endblock %}
+{% block content %}
+<h1>Weather</h1>
+
+<section class="weather-section">
+  <h2>3-Day Forecast &mdash; {{ weather_location }}</h2>
+  {% if forecast %}
+  <div class="forecast-grid">
+    {% for period in forecast %}
+    <div class="forecast-card">
+      <div class="fc-name">{{ period.name }}</div>
+      <div class="fc-temp">{{ period.temperature }}&deg;{{ period.temperatureUnit }}</div>
+      <div class="fc-short">{{ period.shortForecast }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="source-note">Source: National Weather Service (api.weather.gov)</p>
+  {% else %}
+  <p class="empty">Forecast temporarily unavailable &mdash; the NWS API did not respond. Try refreshing in a few minutes.</p>
+  {% endif %}
+</section>
+
+<section class="weather-section">
+  <h2>Radar &mdash; {{ radar_station }}</h2>
+  <img src="https://radar.weather.gov/ridge/standard/{{ radar_station }}_loop.gif" alt="{{ radar_station }} radar loop" class="radar-img">
+  <p class="source-note"><a href="https://radar.weather.gov/station/{{ radar_station }}/standard" target="_blank">Full interactive radar (NWS)</a></p>
+</section>
+
+<section class="weather-section">
+  <h2>Space Weather Conditions</h2>
+  <p class="source-note">
+    Geomagnetic storms and solar activity can degrade HF radio, GPS accuracy, and
+    (in severe cases) grid infrastructure &mdash; relevant to dispatch, navigation,
+    and utility coordination.
+  </p>
+  <div class="spacewx-grid">
+    <div class="spacewx-card">
+      <div class="fc-name">Space Weather Overview</div>
+      <img src="https://services.swpc.noaa.gov/images/swx-overview-large.gif" alt="NOAA space weather overview: X-ray flux, proton flux, and Kp-index" class="spacewx-img">
+    </div>
+    <div class="spacewx-card">
+      <div class="fc-name">Aurora Forecast &mdash; Northern Hemisphere</div>
+      <img src="https://services.swpc.noaa.gov/images/aurora-forecast-northern-hemisphere.jpg" alt="NOAA aurora forecast, northern hemisphere" class="spacewx-img">
+    </div>
+  </div>
+  <p class="source-note">
+    Source: NOAA Space Weather Prediction Center (spaceweather.gov).
+    <a href="https://www.spaceweather.gov/communities/emergency-management" target="_blank">Full Emergency Management dashboard (NOAA)</a>
+  </p>
+</section>
+{% endblock %}

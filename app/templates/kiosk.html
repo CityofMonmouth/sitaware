@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="45">
+<title>{{ board_title }} &mdash; Kiosk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="kiosk">
+<div class="accent-bar"></div>
+<header class="kiosk-header">
+  {% if show_logos %}
+  <div class="logo-strip logo-strip-left">
+    <img src="{{ url_for('static', filename='logos/default-police.png') }}" alt="Police">
+    <img src="{{ url_for('static', filename='logos/default-fire.png') }}" alt="Fire">
+  </div>
+  {% endif %}
+  <div class="kiosk-title">{{ board_title }}</div>
+  {% if show_logos %}
+  <div class="logo-strip logo-strip-right">
+    <img src="{{ url_for('static', filename='logos/default-ems.png') }}" alt="EMS">
+  </div>
+  {% endif %}
+</header>
+<main class="kiosk-main">
+<div class="two-col-layout kiosk-two-col">
+  <div class="briefing-col">
+  {% if not posts %}
+    <p class="empty kiosk-empty">No active updates.</p>
+  {% endif %}
+  <div class="board kiosk-board">
+  {% for post in posts %}
+    <article class="card priority-{{ post.priority }}">
+      <div class="card-head">
+        <span class="badge priority-badge priority-{{ post.priority }}">{{ post.priority|upper }}</span>
+        <span class="badge category-badge">{{ category_labels.get(post.category, post.category) }}</span>
+        <span class="time">{{ post.created_at | central_time }}</span>
+      </div>
+      <h2>{{ post.title }}</h2>
+      <p class="body">{{ post.body }}</p>
+      {% if post.attachments %}
+      <div class="attachments">
+        {% for att in post.attachments %}
+          {% if att.content_type and att.content_type.startswith('image/') %}
+          <span class="att-thumb"><img src="{{ url_for('main.uploaded_file', filename=att.stored_name) }}" alt="{{ att.original_name }}"></span>
+          {% else %}
+          <span class="att-file">&#128206; {{ att.original_name }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="card-foot">
+        <span>{{ post.author_name }}{% if post.agency %} &mdash; {{ post.agency }}{% endif %}</span>
+      </div>
+    </article>
+  {% endfor %}
+  </div>
+  </div>
+  <aside class="weather-col kiosk-weather">
+    <h2 class="sidebar-heading">Weather &mdash; {{ weather_location }}</h2>
+    {% if forecast %}
+    <div class="forecast-grid">
+      {% for period in forecast[:4] %}
+      <div class="forecast-card">
+        <div class="fc-name">{{ period.name }}</div>
+        <div class="fc-temp">{{ period.temperature }}&deg;{{ period.temperatureUnit }}</div>
+        <div class="fc-short">{{ period.shortForecast }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="empty">Forecast temporarily unavailable.</p>
+    {% endif %}
+    <img src="https://radar.weather.gov/ridge/standard/{{ radar_station }}_loop.gif" alt="{{ radar_station }} radar loop" class="radar-img kiosk-radar">
+  </aside>
+</div>
+</main>
+</body>
+</html>
