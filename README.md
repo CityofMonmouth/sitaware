@@ -1,7 +1,7 @@
 # Situational Awareness Board
 
 A free, self-hosted situational awareness and alerting board built for small and rural
-emergency management agencies — the ones priced out of Everbridge, CodeRED, or WebEOC.
+emergency management agencies, the ones priced out of Everbridge, CodeRED, or WebEOC.
 
 Post updates with a priority level, automatically alert staff by email and SMS on
 urgent items, and give your agency (or partner agencies) a shared live view of what's
