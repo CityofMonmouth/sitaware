@@ -1,0 +1,21 @@
+# Real secrets. Never commit this. Create your own locally, see
+# "Agency Customization.md" for what goes in it.
+.env
+.env.*
+!.env.example
+
+# Runtime data: the database and uploaded attachments. Created automatically
+# on first run, never meant to be tracked in version control.
+data/*
+!data/README.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor/OS cruft
+.DS_Store
+.vscode/
+.idea/
+*.swp
