@@ -192,9 +192,42 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        _run_lightweight_migrations(app)
         _ensure_admin(app)
 
     return app
+
+
+def _run_lightweight_migrations(app):
+    """This app doesn't use a full migration framework (Alembic) given its
+    scale, so schema changes made after the initial release are applied here
+    defensively instead. db.create_all() only creates tables that don't exist
+    yet — it does NOT add new columns to a table that's already there, which
+    matters a lot for anyone upgrading an existing deployment with real data
+    in it. This function checks for each column and adds it if missing, and
+    is safe to run on every startup: a no-op once the column already exists.
+    """
+    inspector = db.inspect(db.engine)
+    existing_tables = inspector.get_table_names()
+
+    def column_exists(table, column):
+        if table not in existing_tables:
+            return False
+        return any(col["name"] == column for col in inspector.get_columns(table))
+
+    migrations = [
+        ("post", "deleted_at", "DATETIME"),
+        ("post", "deleted_by_id", "INTEGER"),
+        ("attachment", "deleted_at", "DATETIME"),
+        ("attachment", "deleted_by_id", "INTEGER"),
+    ]
+
+    with db.engine.connect() as conn:
+        for table, column, coltype in migrations:
+            if not column_exists(table, column):
+                conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}"))
+                conn.commit()
+                app.logger.warning(f"[migration] Added column {column} to {table}")
 
 
 def _ensure_admin(app):

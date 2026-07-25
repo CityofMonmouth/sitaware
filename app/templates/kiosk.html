@@ -42,9 +42,9 @@
       </div>
       <h2>{{ post.title }}</h2>
       <p class="body">{{ post.body }}</p>
-      {% if post.attachments %}
+      {% if post.active_attachments %}
       <div class="attachments">
-        {% for att in post.attachments %}
+        {% for att in post.active_attachments %}
           {% if att.content_type and att.content_type.startswith('image/') %}
           <span class="att-thumb"><img src="{{ url_for('main.uploaded_file', filename=att.stored_name) }}" alt="{{ att.original_name }}"></span>
           {% else %}

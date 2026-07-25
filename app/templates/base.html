@@ -36,7 +36,9 @@
       <a href="{{ url_for('main.new_post') }}" class="new-update-link">+ New Update</a>
       {% if current_user.role == 'admin' %}<a href="{{ url_for('main.admin_users') }}">Users</a>
       <a href="{{ url_for('main.admin_subscribers') }}">Email List</a>
-      <a href="{{ url_for('main.admin_sms_subscribers') }}">Text Alerts</a>{% endif %}
+      <a href="{{ url_for('main.admin_sms_subscribers') }}">Text Alerts</a>
+      <a href="{{ url_for('main.admin_deleted_items') }}">Deleted Items</a>
+      <a href="{{ url_for('main.admin_audit_log') }}">Audit Log</a>{% endif %}
       <span class="who">{{ current_user.display_name or current_user.username }}</span>
       <form method="post" action="{{ url_for('main.logout') }}" class="inline-form nav-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

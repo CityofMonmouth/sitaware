@@ -13,7 +13,7 @@ from werkzeug.utils import secure_filename
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 from . import db, limiter
-from .models import User, Post, Attachment, Subscriber, SmsSubscriber
+from .models import User, Post, Attachment, Subscriber, SmsSubscriber, AuditLog
 from .forms import (
     LoginForm, PostForm, UserForm, EditUserForm, SubscriberForm, SmsSubscriberForm,
     EmergencyAlertForm, AgencyAccessForm, CATEGORY_CHOICES, PRIORITY_CHOICES,
@@ -122,6 +122,7 @@ def inject_urgent_count():
         now = datetime.utcnow()
         count = Post.query.filter(
             Post.priority == "urgent",
+            Post.deleted_at.is_(None),
             db.or_(Post.expires_at.is_(None), Post.expires_at > now),
         ).count()
         return dict(urgent_count=count)
@@ -167,18 +168,36 @@ def _delete_attachment_file(att):
         pass
 
 
+def _log_audit(action, target_type, target_id, summary):
+    """Records a soft_delete/restore/purge action. This entry is never
+    itself deleted, even when the thing it refers to is later purged —
+    that's the point: "this record was destroyed" must remain provable
+    after the fact, along with who did it and when."""
+    entry = AuditLog(
+        actor_id=current_user.id if current_user.is_authenticated else None,
+        actor_name=(current_user.display_name or current_user.username)
+        if current_user.is_authenticated else "unknown",
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        summary=summary,
+    )
+    db.session.add(entry)
+
+
 def _gather_email_attachments(post):
     """Reads attachment files off disk for embedding in the notification
     email. Returns (attachments_list, oversized_note) — if the total size
     exceeds MAX_EMAIL_ATTACHMENT_BYTES, files are skipped entirely (rather
     than risking a bounced/rejected email) and oversized_note explains why,
     to be appended to the email body instead."""
-    if not post.attachments:
+    attachments = post.active_attachments
+    if not attachments:
         return [], None
 
     upload_dir = current_app.config["UPLOAD_DIR"]
     total_size = 0
-    for att in post.attachments:
+    for att in attachments:
         path = os.path.join(upload_dir, att.stored_name)
         try:
             total_size += os.path.getsize(path)
@@ -187,14 +206,14 @@ def _gather_email_attachments(post):
 
     if total_size > MAX_EMAIL_ATTACHMENT_BYTES:
         note = (
-            f"This post has {len(post.attachments)} attachment(s) totaling "
+            f"This post has {len(attachments)} attachment(s) totaling "
             f"~{total_size // (1024 * 1024)}MB — too large to include in this "
             f"email. View them on the board instead."
         )
         return [], note
 
     files = []
-    for att in post.attachments:
+    for att in attachments:
         path = os.path.join(upload_dir, att.stored_name)
         try:
             with open(path, "rb") as f:
@@ -279,6 +298,14 @@ def _notify_sms_subscribers(post):
 @main.route("/uploads/<path:filename>")
 @view_access_required
 def uploaded_file(filename):
+    # A soft-deleted attachment is meant to be hidden, not just delisted —
+    # otherwise the direct file URL would still work for anyone who had it,
+    # deletion in name only. Admins retain access since they're the ones who
+    # review/restore/purge from the Deleted Items page.
+    att = Attachment.query.filter_by(stored_name=filename).first()
+    if att and att.is_deleted:
+        if not (current_user.is_authenticated and current_user.role == "admin"):
+            abort(404)
     response = send_from_directory(current_app.config["UPLOAD_DIR"], filename)
     # Uploaded files are user-supplied; extension is validated at upload time, but
     # this stops browsers from content-sniffing a mislabeled file as something
@@ -294,7 +321,10 @@ def index():
     category = request.args.get("category", "")
     priority = request.args.get("priority", "")
 
-    query = Post.query.filter(db.or_(Post.expires_at.is_(None), Post.expires_at > now))
+    query = Post.query.filter(
+        Post.deleted_at.is_(None),
+        db.or_(Post.expires_at.is_(None), Post.expires_at > now),
+    )
     if category:
         query = query.filter(Post.category == category)
     if priority:
@@ -326,7 +356,11 @@ def archive():
     category = request.args.get("category", "")
     priority = request.args.get("priority", "")
 
-    query = Post.query.filter(Post.expires_at.isnot(None), Post.expires_at <= now)
+    query = Post.query.filter(
+        Post.deleted_at.is_(None),
+        Post.expires_at.isnot(None),
+        Post.expires_at <= now,
+    )
     if category:
         query = query.filter(Post.category == category)
     if priority:
@@ -349,7 +383,10 @@ def archive():
 def kiosk():
     now = datetime.utcnow()
     posts = (
-        Post.query.filter(db.or_(Post.expires_at.is_(None), Post.expires_at > now))
+        Post.query.filter(
+            Post.deleted_at.is_(None),
+            db.or_(Post.expires_at.is_(None), Post.expires_at > now),
+        )
         .order_by(Post.created_at.desc())
         .all()
     )
@@ -540,11 +577,19 @@ def delete_post(post_id):
     post = db.session.get(Post, post_id) or abort(404)
     if post.author_id != current_user.id and current_user.role != "admin":
         abort(403)
-    for att in post.attachments:
-        _delete_attachment_file(att)
-    db.session.delete(post)
+    # Soft delete only — the row and any attached files stay on disk. This
+    # is deliberate: an ordinary "delete" click should never be the same
+    # thing as permanently destroying a public record. See _log_audit and
+    # the /admin/deleted-items page for how this gets reviewed and, if
+    # appropriate, actually purged later.
+    post.deleted_at = datetime.utcnow()
+    post.deleted_by_id = current_user.id
+    _log_audit(
+        "soft_delete", "post", post.id,
+        f"Title: {post.title}\nCategory: {post.category}\nPriority: {post.priority}\n\n{post.body}",
+    )
     db.session.commit()
-    flash("Update removed.", "success")
+    flash("Update removed from the board. It can be restored or permanently purged from Deleted Items.", "success")
     return redirect(url_for("main.index"))
 
 
@@ -555,11 +600,113 @@ def delete_attachment(attachment_id):
     post = att.post
     if post.author_id != current_user.id and current_user.role != "admin":
         abort(403)
+    # Soft delete — same reasoning as delete_post above. The file stays on
+    # disk until an actual purge.
+    att.deleted_at = datetime.utcnow()
+    att.deleted_by_id = current_user.id
+    _log_audit("soft_delete", "attachment", att.id, f"Filename: {att.original_name} (post: {post.title})")
+    db.session.commit()
+    flash("Attachment removed. It can be restored or permanently purged from Deleted Items.", "success")
+    return redirect(url_for("main.edit_post", post_id=post.id))
+
+
+@main.route("/admin/deleted-items")
+@login_required
+def admin_deleted_items():
+    if current_user.role != "admin":
+        abort(403)
+    deleted_posts = (
+        Post.query.filter(Post.deleted_at.isnot(None))
+        .order_by(Post.deleted_at.desc())
+        .all()
+    )
+    deleted_attachments = (
+        Attachment.query.filter(Attachment.deleted_at.isnot(None))
+        .order_by(Attachment.deleted_at.desc())
+        .all()
+    )
+    return render_template(
+        "admin_deleted_items.html",
+        deleted_posts=deleted_posts,
+        deleted_attachments=deleted_attachments,
+        category_labels=CATEGORY_LABELS,
+    )
+
+
+@main.route("/admin/post/<int:post_id>/restore", methods=["POST"])
+@login_required
+def restore_post(post_id):
+    post = db.session.get(Post, post_id) or abort(404)
+    if post.author_id != current_user.id and current_user.role != "admin":
+        abort(403)
+    post.deleted_at = None
+    post.deleted_by_id = None
+    _log_audit("restore", "post", post.id, f"Title: {post.title}")
+    db.session.commit()
+    flash("Update restored to the board.", "success")
+    return redirect(url_for("main.admin_deleted_items"))
+
+
+@main.route("/admin/post/<int:post_id>/purge", methods=["POST"])
+@login_required
+def purge_post(post_id):
+    if current_user.role != "admin":
+        abort(403)
+    post = db.session.get(Post, post_id) or abort(404)
+    if not post.is_deleted:
+        # Purging is only ever allowed on something already soft-deleted —
+        # this prevents a purge link/form from ever being used to skip the
+        # soft-delete step entirely.
+        abort(400)
+    summary = f"Title: {post.title}\nCategory: {post.category}\nPriority: {post.priority}\n\n{post.body}"
+    for att in post.attachments:
+        _delete_attachment_file(att)
+    _log_audit("purge", "post", post.id, summary)
+    db.session.delete(post)
+    db.session.commit()
+    flash("Update permanently purged.", "success")
+    return redirect(url_for("main.admin_deleted_items"))
+
+
+@main.route("/admin/attachment/<int:attachment_id>/restore", methods=["POST"])
+@login_required
+def restore_attachment(attachment_id):
+    att = db.session.get(Attachment, attachment_id) or abort(404)
+    post = att.post
+    if post.author_id != current_user.id and current_user.role != "admin":
+        abort(403)
+    att.deleted_at = None
+    att.deleted_by_id = None
+    _log_audit("restore", "attachment", att.id, f"Filename: {att.original_name}")
+    db.session.commit()
+    flash("Attachment restored.", "success")
+    return redirect(url_for("main.admin_deleted_items"))
+
+
+@main.route("/admin/attachment/<int:attachment_id>/purge", methods=["POST"])
+@login_required
+def purge_attachment(attachment_id):
+    if current_user.role != "admin":
+        abort(403)
+    att = db.session.get(Attachment, attachment_id) or abort(404)
+    if not att.is_deleted:
+        abort(400)
+    summary = f"Filename: {att.original_name} (post: {att.post.title})"
     _delete_attachment_file(att)
+    _log_audit("purge", "attachment", att.id, summary)
     db.session.delete(att)
     db.session.commit()
-    flash("Attachment removed.", "success")
-    return redirect(url_for("main.edit_post", post_id=post.id))
+    flash("Attachment permanently purged.", "success")
+    return redirect(url_for("main.admin_deleted_items"))
+
+
+@main.route("/admin/audit-log")
+@login_required
+def admin_audit_log():
+    if current_user.role != "admin":
+        abort(403)
+    entries = AuditLog.query.order_by(AuditLog.timestamp.desc()).limit(500).all()
+    return render_template("admin_audit_log.html", entries=entries)
 
 
 @main.route("/admin/users", methods=["GET", "POST"])

@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Audit Log</h1>
+<p class="source-note">
+  A permanent record of every delete, restore, and purge action &mdash; including
+  purges, so &ldquo;this record was destroyed, by whom, and when&rdquo; stays provable
+  even after the record itself is gone. Showing the most recent 500 entries.
+</p>
+
+<table class="userlist">
+<tr><th>When</th><th>Who</th><th>Action</th><th>Type</th><th>Details</th></tr>
+{% for entry in entries %}
+<tr>
+  <td>{{ entry.timestamp | central_time }}</td>
+  <td>{{ entry.actor_name }}</td>
+  <td>{{ entry.action }}</td>
+  <td>{{ entry.target_type }} #{{ entry.target_id }}</td>
+  <td style="white-space: pre-wrap; max-width: 400px;">{{ entry.summary }}</td>
+</tr>
+{% else %}
+<tr><td colspan="5" class="empty">No audit entries yet.</td></tr>
+{% endfor %}
+</table>
+{% endblock %}

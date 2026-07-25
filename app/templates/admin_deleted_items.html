@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>Deleted Items</h1>
+<p class="source-note">
+  Nothing here was actually destroyed &mdash; a &ldquo;deleted&rdquo; post or attachment
+  is hidden from the board but stays here until it's restored or permanently purged.
+  Every action taken on this page is recorded in the <a href="{{ url_for('main.admin_audit_log') }}">Audit Log</a>.
+</p>
+
+<h2>Deleted Updates</h2>
+{% if not deleted_posts %}
+<p class="empty">Nothing here.</p>
+{% endif %}
+<div class="board">
+{% for post in deleted_posts %}
+  <article class="card priority-{{ post.priority }} archived">
+    <div class="card-head">
+      <span class="badge priority-badge priority-{{ post.priority }}">{{ post.priority|upper }}</span>
+      <span class="badge category-badge">{{ category_labels.get(post.category, post.category) }}</span>
+      <span class="time">{{ post.created_at | central_time }}</span>
+    </div>
+    <h2>{{ post.title }}</h2>
+    <p class="body">{{ post.body }}</p>
+    <div class="card-foot">
+      <span>{{ post.author_name }}{% if post.agency %} &mdash; {{ post.agency }}{% endif %}
+        &mdash; deleted {{ post.deleted_at | central_time }}</span>
+      <span class="actions">
+        <form method="post" action="{{ url_for('main.restore_post', post_id=post.id) }}" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="link-btn">Restore</button>
+        </form>
+        <form method="post" action="{{ url_for('main.purge_post', post_id=post.id) }}" class="inline-form" data-confirm="Permanently purge this update? This cannot be undone &mdash; the post and any attachments will be completely removed, though the fact that it was purged, and by whom, stays in the Audit Log.">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="link-btn">Purge Permanently</button>
+        </form>
+      </span>
+    </div>
+  </article>
+{% endfor %}
+</div>
+
+<h2 style="margin-top: 32px;">Deleted Attachments</h2>
+{% if not deleted_attachments %}
+<p class="empty">Nothing here.</p>
+{% endif %}
+<table class="userlist">
+<tr><th>File</th><th>Post</th><th>Deleted</th><th></th></tr>
+{% for att in deleted_attachments %}
+<tr>
+  <td>{{ att.original_name }}</td>
+  <td>{{ att.post.title if att.post else '(post no longer exists)' }}</td>
+  <td>{{ att.deleted_at | central_time }}</td>
+  <td>
+    <form method="post" action="{{ url_for('main.restore_attachment', attachment_id=att.id) }}" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit">Restore</button>
+    </form>
+    <form method="post" action="{{ url_for('main.purge_attachment', attachment_id=att.id) }}" class="inline-form" data-confirm="Permanently purge this file? This cannot be undone.">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit">Purge</button>
+    </form>
+  </td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}
