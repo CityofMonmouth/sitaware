@@ -552,6 +552,13 @@ def edit_post(post_id):
     post = db.session.get(Post, post_id) or abort(404)
     if post.author_id != current_user.id and current_user.role != "admin":
         abort(403)
+    if post.is_deleted:
+        # A soft-deleted post is pending review/restore/purge, and the audit
+        # log holds a snapshot of its content as of deletion. Allowing edits
+        # here would let someone quietly alter a record after that snapshot
+        # was taken, so the two would no longer agree. Restore it first.
+        flash("This update has been deleted. Restore it from Deleted Items before editing.", "error")
+        return redirect(url_for("main.index"))
     form = PostForm(obj=post)
     if form.validate_on_submit():
         post.title = form.title.data.strip()
@@ -577,6 +584,13 @@ def delete_post(post_id):
     post = db.session.get(Post, post_id) or abort(404)
     if post.author_id != current_user.id and current_user.role != "admin":
         abort(403)
+    if post.is_deleted:
+        # Re-deleting would overwrite deleted_at/deleted_by_id, destroying the
+        # record of who removed it first and when. That's exactly the fact the
+        # audit trail exists to preserve, so refuse rather than silently
+        # rewrite history.
+        flash("That update is already deleted.", "error")
+        return redirect(url_for("main.index"))
     # Soft delete only — the row and any attached files stay on disk. This
     # is deliberate: an ordinary "delete" click should never be the same
     # thing as permanently destroying a public record. See _log_audit and
@@ -600,6 +614,11 @@ def delete_attachment(attachment_id):
     post = att.post
     if post.author_id != current_user.id and current_user.role != "admin":
         abort(403)
+    if att.is_deleted:
+        # Same reasoning as delete_post: re-deleting would overwrite the
+        # record of who removed it first and when.
+        flash("That attachment is already deleted.", "error")
+        return redirect(url_for("main.edit_post", post_id=post.id))
     # Soft delete — same reasoning as delete_post above. The file stays on
     # disk until an actual purge.
     att.deleted_at = datetime.utcnow()
@@ -639,6 +658,13 @@ def restore_post(post_id):
     post = db.session.get(Post, post_id) or abort(404)
     if post.author_id != current_user.id and current_user.role != "admin":
         abort(403)
+    if not post.is_deleted:
+        # Nothing to restore. Without this guard a repeated request would
+        # write a "restore" entry to the audit log for something that was
+        # never deleted, which is misleading noise in a record meant to be
+        # relied on.
+        flash("That update is not deleted.", "error")
+        return redirect(url_for("main.admin_deleted_items"))
     post.deleted_at = None
     post.deleted_by_id = None
     _log_audit("restore", "post", post.id, f"Title: {post.title}")
@@ -659,8 +685,16 @@ def purge_post(post_id):
         # soft-delete step entirely.
         abort(400)
     summary = f"Title: {post.title}\nCategory: {post.category}\nPriority: {post.priority}\n\n{post.body}"
+    # Log each attachment separately before the cascade removes it. Without
+    # this, purging a post silently destroys its files with no record of what
+    # they were — the audit trail would show the post's text was destroyed but
+    # be unable to answer "which documents went with it?"
     for att in post.attachments:
         _delete_attachment_file(att)
+        _log_audit(
+            "purge", "attachment", att.id,
+            f"Filename: {att.original_name} (destroyed with post #{post.id}: {post.title})",
+        )
     _log_audit("purge", "post", post.id, summary)
     db.session.delete(post)
     db.session.commit()
@@ -675,6 +709,9 @@ def restore_attachment(attachment_id):
     post = att.post
     if post.author_id != current_user.id and current_user.role != "admin":
         abort(403)
+    if not att.is_deleted:
+        flash("That attachment is not deleted.", "error")
+        return redirect(url_for("main.admin_deleted_items"))
     att.deleted_at = None
     att.deleted_by_id = None
     _log_audit("restore", "attachment", att.id, f"Filename: {att.original_name}")

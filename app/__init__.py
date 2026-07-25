@@ -224,10 +224,25 @@ def _run_lightweight_migrations(app):
 
     with db.engine.connect() as conn:
         for table, column, coltype in migrations:
-            if not column_exists(table, column):
+            if column_exists(table, column):
+                continue
+            try:
                 conn.execute(db.text(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}"))
                 conn.commit()
                 app.logger.warning(f"[migration] Added column {column} to {table}")
+            except Exception as e:
+                # Gunicorn runs multiple worker processes, each of which calls
+                # create_app() independently at startup. Without --preload they
+                # do this concurrently, so all workers can check "does this
+                # column exist?", all see no, and all attempt the ALTER. The
+                # first wins; the rest hit "duplicate column name" or a lock.
+                # That's harmless (the column exists either way), so swallow it
+                # rather than let a losing worker crash the whole boot.
+                conn.rollback()
+                app.logger.info(
+                    f"[migration] Skipped {column} on {table} "
+                    f"(likely added concurrently by another worker): {e}"
+                )
 
 
 def _ensure_admin(app):
@@ -243,9 +258,20 @@ def _ensure_admin(app):
             role="admin",
             password_hash=generate_password_hash(password),
         )
-        db.session.add(admin)
-        db.session.commit()
-        app.logger.warning(
-            "Created initial admin user '%s'. CHANGE THIS PASSWORD IMMEDIATELY.",
-            username,
-        )
+        try:
+            db.session.add(admin)
+            db.session.commit()
+            app.logger.warning(
+                "Created initial admin user '%s'. CHANGE THIS PASSWORD IMMEDIATELY.",
+                username,
+            )
+        except Exception as e:
+            # Same concurrent-worker race as the migration above: several
+            # workers can each see an empty users table and each try to insert
+            # the same admin. The username unique constraint means all but one
+            # fail. That's the correct outcome (exactly one admin exists), so
+            # don't let the losing workers crash the boot.
+            db.session.rollback()
+            app.logger.info(
+                "Initial admin already created by another worker: %s", e
+            )
